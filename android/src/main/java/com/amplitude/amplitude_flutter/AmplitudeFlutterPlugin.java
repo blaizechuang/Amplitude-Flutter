@@ -23,7 +23,6 @@ public class AmplitudeFlutterPlugin implements MethodCallHandler {
   String carrierName;
   private final TelephonyManager mTelephonyManager;
   private Result mResult;
-  boolean permissionGranted;
   private static int READ_PHONE_STATE = 123;
 
   private AmplitudeFlutterPlugin(Activity activity) {
@@ -43,16 +42,14 @@ public class AmplitudeFlutterPlugin implements MethodCallHandler {
     registrar.addRequestPermissionsResultListener(new PluginRegistry.RequestPermissionsResultListener() {
       @Override
       public boolean onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-        boolean permissionGranted;
-        if ((requestCode == READ_PHONE_STATE) && (grantResults.length > 0)
-            && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-          permissionGranted = true;
+        if (requestCode == READ_PHONE_STATE) {
+          boolean permissionGranted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+          amplitudeFlutterPlugin.processCarrierResult(permissionGranted);
+          return true;
         } else {
-          permissionGranted = false;
-
+          // We don't care other permissions other than READ_PHONE_STATE
+          return false;
         }
-        amplitudeFlutterPlugin.processCarrierResult(permissionGranted);
-        return permissionGranted;
       }
     });
   }
@@ -69,6 +66,7 @@ public class AmplitudeFlutterPlugin implements MethodCallHandler {
     } else {
       result.notImplemented();
     }
+    mResult = null;
   }
 
   private void getCarrierInfoWithPermissions(Result result) {
@@ -79,7 +77,7 @@ public class AmplitudeFlutterPlugin implements MethodCallHandler {
       result.success(carrierName);
     } else {
       ActivityCompat.requestPermissions(this.mActivity, new String[] { Manifest.permission.READ_PHONE_STATE },
-          READ_PHONE_STATE);
+              READ_PHONE_STATE);
     }
   }
 
@@ -93,6 +91,12 @@ public class AmplitudeFlutterPlugin implements MethodCallHandler {
   }
 
   private void processCarrierResult(boolean permission) {
+    // We only proceed only when permission is triggered when `device` method is called.
+    // That means mResult is not null.
+    if (mResult == null) {
+      return;
+    }
+
     if (permission) {
       String name = getCarrierName();
       mResult.success(name);
